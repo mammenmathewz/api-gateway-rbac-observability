@@ -219,13 +219,8 @@ npm run build
 npm start
 ```
 
-### Environment Variables
-- `NODE_ENV`: Environment (development/production)
-- `PORT`: Server port (default: 3000)
-- `KEYCLOAK_URL`: Keycloak server URL
-- `BACKEND_URL`: Backend service URL
 
-## 🧪 Testing
+
 
 ### Manual Testing with Postman
 1. Import the provided Postman collection
@@ -249,15 +244,6 @@ npm start
 - Efficient JWT validation with caching
 - Async/await patterns for non-blocking operations
 - Prometheus metrics for performance monitoring
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests for new functionality
-5. Submit a pull request
-
 
 
 
