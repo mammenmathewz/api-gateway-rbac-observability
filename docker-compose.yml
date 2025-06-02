@@ -1,0 +1,103 @@
+version: '3.8'
+services:
+  api-gateway:
+    build: ./api-gateway
+    ports:
+      - "3000:3000"
+      - "9464:9464" # Prometheus metrics endpoint for API Gateway
+    depends_on:
+      - backend
+      - keycloak
+      - otel-collector # Depend on OTel collector for traces
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317 # OTLP gRPC endpoint for traces/metrics
+      OTEL_RESOURCE_ATTRIBUTES: service.name=api-gateway,environment=development
+      NODE_ENV: development
+
+  backend:
+    build: ./backend-service
+    ports:
+      - "4000:4000"
+      - "9465:9465" # Prometheus metrics endpoint for Backend Service
+    depends_on:
+      - otel-collector # Depend on OTel collector for traces
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      OTEL_RESOURCE_ATTRIBUTES: service.name=backend-service,environment=development
+      NODE_ENV: development
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0.1
+    command: start-dev # Use 'start-dev' for local development convenience with external DB
+    environment:
+      - KEYCLOAK_ADMIN=admin
+      - KEYCLOAK_ADMIN_PASSWORD=admin
+      # Database Configuration for Persistence
+      - KC_DB=postgres
+      - KC_DB_URL=jdbc:postgresql://keycloak-db:5432/keycloak
+      - KC_DB_USERNAME=keycloak
+      - KC_DB_PASSWORD=keycloak
+      # Hostname for Keycloak (required in 'start' mode, good to have here too)
+      - KC_HOSTNAME=localhost
+      - KC_HOSTNAME_STRICT_HTTPS=false # Disable HTTPS requirement for local dev
+      - KC_HEALTH_ENABLED=true # Enable health endpoints
+      - KC_METRICS_ENABLED=true # Enable metrics endpoint
+    ports:
+      - "8080:8080"
+    depends_on:
+      - keycloak-db # Keycloak depends on its database
+
+  # New Service: Keycloak's PostgreSQL Database
+  keycloak-db:
+    image: postgres:13 # Use a stable PostgreSQL image
+    environment:
+      - POSTGRES_DB=keycloak
+      - POSTGRES_USER=keycloak
+      - POSTGRES_PASSWORD=keycloak
+    volumes:
+      - keycloak_data:/var/lib/postgresql/data # Mount a named volume for persistent DB data
+    # Optional: You can expose this port if you need to access the DB directly (e.g., with a DB client)
+    # - "5432:5432"
+
+  prometheus:
+    image: prom/prometheus
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    command: --config.file=/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    depends_on:
+      - api-gateway
+      - backend
+      - keycloak # Prometheus can also scrape Keycloak metrics
+
+  grafana:
+    image: grafana/grafana
+    ports:
+      - "3001:3000" # Grafana default port is 3000, exposing on 3001
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning # Auto-provision datasources
+    depends_on:
+      - prometheus # Ensure Prometheus is up before Grafana
+
+  otel-collector:
+    image: otel/opentelemetry-collector:0.99.0 # Use a recent stable version
+    command: ["--config=/etc/otelcol-config.yml"]
+    volumes:
+      - ./otel-collector/otelcol-config.yml:/etc/otelcol-config.yml
+    ports:
+      - "4317:4317" # OTLP gRPC receiver
+      - "4318:4318" # OTLP HTTP receiver
+      - "8888:8888" # Health Check Extension
+
+networks:
+  default:
+    driver: bridge
+
+# Define the named volume for Keycloak's persistent data
+volumes:
+  keycloak_data:
+    driver: local

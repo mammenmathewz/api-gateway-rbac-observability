@@ -1,0 +1,40 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+      http:
+
+exporters:
+  logging: # For debugging and seeing what's coming into the collector
+    verbosity: detailed
+  prometheus:
+    endpoint: "0.0.0.0:8889" # Collector exposes its own Prometheus metrics
+  # If you add Jaeger for tracing, uncomment and configure this:
+  # jaeger:
+  #   endpoint: "jaeger:14250" # Jaeger gRPC endpoint
+  #   tls:
+  #     insecure: true
+
+processors:
+  batch: # Batching helps with efficiency
+    send_batch_size: 100
+    timeout: 10s
+  memory_limiter:
+    limit_mib: 256
+    spike_limit_mib: 64
+    check_interval: 5s
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [logging] # For now, just log traces. Add `jaeger` here if you configure it.
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [logging, prometheus] # Export metrics to Prometheus and log them
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [logging] # Log incoming OTLP logs (if any)

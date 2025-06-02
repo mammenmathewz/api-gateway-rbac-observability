@@ -1,0 +1,28 @@
+global:
+  scrape_interval: 5s # Your desired scrape interval
+  evaluation_interval: 5s
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: 'api-gateway'
+    metrics_path: /metrics # Default path for prom-client
+    static_configs:
+      - targets: ['api-gateway:9464'] # Scrape metrics from API Gateway on the new port
+
+  - job_name: 'backend-service'
+    metrics_path: /metrics # Default path for prom-client
+    static_configs:
+      - targets: ['backend:9465'] # Scrape metrics from Backend Service on the new port
+
+  - job_name: 'keycloak'
+    metrics_path: /metrics # Keycloak's default metrics path
+    static_configs:
+      - targets: ['keycloak:8080']
+    relabel_configs: # Optional: Add a label to identify Keycloak metrics
+      - source_labels: [__address__]
+        regex: '.*'
+        target_label: instance
+        replacement: 'keycloak'
